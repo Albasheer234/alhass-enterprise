@@ -5,7 +5,7 @@
   "description": "ALHASS Integrated Enterprise - Business website, product catalogue, WhatsApp ordering and secure admin dashboard",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma db push && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
