@@ -1,5 +1,4 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const ALLOWED_MIME: Record<string, string> = {
@@ -11,10 +10,14 @@ const ALLOWED_MIME: Record<string, string> = {
 };
 
 const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
-const MAX_HERO_SIZE = 6 * 1024 * 1024; // 6 MB — hero images may be larger
+const MAX_HERO_SIZE = 6 * 1024 * 1024; // 6 MB
+
+// Check if we're running on Vercel (read-only filesystem)
+const isVercel = !!process.env.VERCEL || !!process.env.BLOB_READ_WRITE_TOKEN;
 
 /**
  * Validates and stores a product image upload.
+ * Uses Vercel Blob in production, local filesystem in development.
  * Returns the public URL path, or throws with a user-safe message.
  */
 export async function saveProductImage(file: File): Promise<string> {
@@ -24,26 +27,39 @@ export async function saveProductImage(file: File): Promise<string> {
   if (file.size > MAX_SIZE) {
     throw new Error('Image is too large. Maximum size is 2MB.');
   }
-  // Extra safety: never trust the extension, derive it from the MIME type
-  const ext = ALLOWED_MIME[file.type];
-  const name = `${Date.now()}-${randomBytes(8).toString('hex')}${ext}`;
 
-  const dir = path.join(process.cwd(), 'public', 'uploads');
-  await mkdir(dir, { recursive: true });
+  const ext = ALLOWED_MIME[file.type];
+  const name = `products/${Date.now()}-${randomBytes(8).toString('hex')}${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  // Reject SVGs containing script tags (SVG can carry JS)
-  if (ext === '.svg' && /\<script[\s>]/i.test(buffer.toString('utf8'))) {
+  // Reject SVGs containing script tags
+  if (ext === '.svg' && /<script[\s>]/i.test(buffer.toString('utf8'))) {
     throw new Error('SVG files with embedded scripts are not allowed.');
   }
 
-  await writeFile(path.join(dir, name), buffer);
-  return `/uploads/${name}`;
+  if (isVercel) {
+    // Use Vercel Blob in production
+    const { put } = await import('@vercel/blob');
+    const blob = await put(name, buffer, {
+      access: 'public',
+      contentType: file.type,
+    });
+    return blob.url;
+  } else {
+    // Use local filesystem in development
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    const dir = path.join(process.cwd(), 'public', 'uploads');
+    await mkdir(dir, { recursive: true });
+    const filename = path.basename(name);
+    await writeFile(path.join(dir, filename), buffer);
+    return `/uploads/${filename}`;
+  }
 }
 
 /**
  * Validates and stores a hero background image.
- * Saved to public/uploads/hero/. Returns the public URL path.
+ * Uses Vercel Blob in production, local filesystem in development.
+ * Returns the public URL.
  */
 export async function saveHeroImage(file: File): Promise<string> {
   const allowed: Record<string, string> = {
@@ -57,11 +73,26 @@ export async function saveHeroImage(file: File): Promise<string> {
   if (file.size > MAX_HERO_SIZE) {
     throw new Error('Hero image is too large. Maximum size is 6 MB.');
   }
+
   const ext = allowed[file.type];
-  const name = `hero-${Date.now()}-${randomBytes(6).toString('hex')}${ext}`;
-  const dir = path.join(process.cwd(), 'public', 'uploads', 'hero');
-  await mkdir(dir, { recursive: true });
+  const name = `hero/hero-${Date.now()}-${randomBytes(6).toString('hex')}${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(dir, name), buffer);
-  return `/uploads/hero/${name}`;
+
+  if (isVercel) {
+    // Use Vercel Blob in production
+    const { put } = await import('@vercel/blob');
+    const blob = await put(name, buffer, {
+      access: 'public',
+      contentType: file.type,
+    });
+    return blob.url;
+  } else {
+    // Use local filesystem in development
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    const dir = path.join(process.cwd(), 'public', 'uploads', 'hero');
+    await mkdir(dir, { recursive: true });
+    const filename = path.basename(name);
+    await writeFile(path.join(dir, filename), buffer);
+    return `/uploads/hero/${filename}`;
+  }
 }
