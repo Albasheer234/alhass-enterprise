@@ -66,6 +66,7 @@ export async function createProductAction(_prev: FormState, formData: FormData):
   await logAction(auth.admin.id, 'PRODUCT_CREATED', 'Product', product.id, { name: product.name });
   revalidatePath('/admin/products');
   revalidatePath('/shop');
+  revalidatePath('/');
   return { success: 'Product created successfully.' };
 }
 
@@ -111,6 +112,7 @@ export async function updateProductAction(_prev: FormState, formData: FormData):
   revalidatePath('/admin/products');
   revalidatePath('/shop');
   revalidatePath(`/shop/${existing.slug}`);
+  revalidatePath('/');
   return { success: 'Product updated successfully.' };
 }
 

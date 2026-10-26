@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
 import type { Product, Category } from '@prisma/client';
 import { productWhatsAppUrl } from '@/lib/whatsapp';
 
@@ -13,17 +16,20 @@ export default function ProductCard({
   };
   whatsappNumber: string;
 }) {
+  const [imgSrc, setImgSrc] = useState(product.imageUrl ?? PLACEHOLDER);
+
   return (
     <article className="card">
       <div className="card__media">
         {product.isFeatured && <span className="card__badge">Featured</span>}
         <Link href={`/shop/${product.slug}`} tabIndex={-1} aria-hidden="true">
           <img
-            src={product.imageUrl ?? PLACEHOLDER}
+            src={imgSrc}
             alt={product.imageUrl ? product.name : `${product.name} (image coming soon)`}
             loading="lazy"
             width={800}
             height={600}
+            onError={() => setImgSrc(PLACEHOLDER)}
           />
         </Link>
       </div>
